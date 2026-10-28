@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan Classes! | Study Planner</title>
+
+  <style>
+    body {
+      font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif, sans-serif;
+      background: hsl(309, 83%, 91%);
+      color: #3f2d4e;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    h1 { margin-bottom: 5px; }
+    .subtitle { color: #687087; }
+
+    form, .dashboard {
+      background: rgb(248, 185, 248);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 20px 0;
+    }
+
+    input, select, button {
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid #d8dce8;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    input, select { box-sizing: border-box; }
+
+    form input, form select { width: 100%; }
+
+    button {
+      background: #63d44d;
+      color: white;
+      cursor: pointer;
+      border: none;
+    }
+
+    .task {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .task-info { overflow-wrap: anywhere; }
+    .task small { display: block; color: #687087; margin-top: 6px; }
+    .completed { text-decoration: line-through; opacity: 0.55; }
+    .delete { background: #d94b58; }
+    .task button { flex-shrink: 0; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; }
+    .filters select { flex: 1; min-width: 140px; }
+
+    @media (max-width: 500px) {
+      body { margin: 10px auto; padding: 12px; }
+      .task { align-items: flex-start; }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>the best planner</h1>
+  <p class="subtitle">prevail over procrastination!</p>
+
+  <div class="dashboard">
+    <h2>your progress</h2>
+    <p id="stats">0 assignments completed out of 0</p>
+  </div>
+
+  <form id="task-form">
+    <h2>add an assignment</h2>
+
+    <input id="title" placeholder="assignment name" required>
+
+    <input id="course" placeholder="course (e.g. chemistry)" required>
+
+    <label for="due-date">Due date</label>
+    <input id="due-date" type="date" required>
+
+    <select id="priority">
+      <option value="low">low priority</option>
+      <option value="medium" selected>medium priority</option>
+      <option value="high">high priority</option>
+    </select>
+
+    <button type="submit">add assignment</button>
+  </form>
+
+  <h2>my assignments</h2>
+
+  <div class="filters">
+    <select id="filter">
+      <option value="All">all assignments</option>
+      <option value="Active">incomplete</option>
+      <option value="completed">completed</option>
+    </select>
+
+    <select id="sort">
+      <option value="date">sort by due date</option>
+      <option value="priority">sort by priority</option>
+    </select>
+  </div>
+
+  <div id="task-list"></div>
+
+  <script>
+    const form = document.getElementById("task-form");
+    const taskList = document.getElementById("task-list");
+    const filter = document.getElementById("filter");
+    const sort = document.getElementById("sort");
+
+    let tasks = JSON.parse(
+      localStorage.getItem("studyflow-tasks") || "[]"
+    );
+
+    function saveTasks() {
+      localStorage.setItem(
+        "studyflow-tasks",
+        JSON.stringify(tasks)
+      );
+    }
+
+    function renderTasks() {
+      taskList.replaceChildren();
+
+      let visibleTasks = tasks.filter(task => {
+        if (filter.value === "active") return !task.completed;
+        if (filter.value === "completed") return task.completed;
+        return true;
+      });
+
+      if (sort.value === "priority") {
+        const rank = { High: 1, Medium: 2, Low: 3 };
+        visibleTasks.sort(
+          (a, b) => rank[a.priority] - rank[b.priority]
+        );
+      } else {
+        visibleTasks.sort(
+          (a, b) => a.dueDate.localeCompare(b.dueDate)
+        );
+      }
+
+      document.getElementById("stats").textContent =
+        `${tasks.filter(t => t.completed).length} assignments completed out of ${tasks.length}`;
+
+      if (visibleTasks.length === 0) {
+        taskList.textContent = "No assignments to show.";
+      }
+
+      visibleTasks.forEach(task => {
+        const card = document.createElement("div");
+        card.className = "task";
+
+        const info = document.createElement("div");
+        info.className = "task-info";
+
+        const title = document.createElement("strong");
+        title.textContent = task.title;
+        if (task.completed) title.className = "completed";
+
+        const details = document.createElement("small");
+        details.textContent =
+          `${task.course} · Due ${task.dueDate} · ${task.priority} priority`;
+
+        info.append(title, details);
+
+        const actions = document.createElement("div");
+
+        const completeButton = document.createElement("button");
+        completeButton.textContent =
+          task.completed ? "Undo" : "complete";
+
+        completeButton.addEventListener("click", () => {
+          task.completed = !task.completed;
+          saveTasks();
+          renderTasks();
+        });
+
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "delete";
+        deleteButton.className = "delete";
+
+        deleteButton.addEventListener("click", () => {
+          tasks = tasks.filter(t => t.id !== task.id);
+          saveTasks();
+          renderTasks();
+        });
+
+        actions.append(completeButton, deleteButton);
+        card.append(info, actions);
+        taskList.append(card);
+      });
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+
+      const title = document.getElementById("title").value.trim();
+      const course = document.getElementById("course").value.trim();
+      const dueDate = document.getElementById("due-date").value;
+      const priority = document.getElementById("priority").value;
+
+      if (!title || !course || !dueDate) return;
+
+      tasks.push({
+        id: crypto.randomUUID(),
+        title,
+        course,
+        dueDate,
+        priority,
+        completed: false
+      });
+
+      saveTasks();
+      form.reset();
+      renderTasks();
+    });
+
+    filter.addEventListener("change", renderTasks);
+    sort.addEventListener("change", renderTasks);
+
+    renderTasks();
+  </script>
+</body>
+</html>
